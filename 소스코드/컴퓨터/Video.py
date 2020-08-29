@@ -1,42 +1,41 @@
-import io
-import time
 from threading import Thread
+import time
+
+import cv2
 
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-import folium
-from folium import plugins
 
+class Video(QObject):
+    sendImage = pyqtSignal(QImage)
 
-class GPS(QObject):
-    def __init__(self, widget, size, mapDateIo):
+    def __init__(self, widget, size):
         super().__init__()
         self.flag = False
         self.widget = widget
         self.size = size
-        self.dateIo = mapDateIo
+        self.sendImage.connect(self.widget.recvImage)
 
-        self.GPSInit()
-
-    def GPSInit(self):
-        self.location = [45.5236, -122.6750]
-        self.m = folium.Map(self.location,
-                            tiles="Stamen Toner",
-                            zoom_start=16)
-
-    def startSGP(self):
-        self.flag = True
+    def videoInit(self):
         try:
             self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+            #self.cap = cv2.VideoCapture("http://192.168.219.104:81/stream", cv2.CAP_DSHOW)
+            self.capWidth = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.capHeight = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            print(str(self.capWidth) + str(self.capHeight))
         except Exception as e:
-            print('GPS Error : ', e)
-        else:
-            self.bThread = True
-            self.thread = Thread(target=self.threadFunc)
-            self.thread.start()
+            print('Cam Error : ', e)
 
-    def stopGPS(self):
+    def startCam(self):
+        self.flag = True
+        self.videoInit()
+
+        self.bThread = True
+        self.thread = Thread(target=self.threadFunc)
+        self.thread.start()
+
+    def stopCam(self):
         self.bThread = False
         bopen = False
 
@@ -50,10 +49,12 @@ class GPS(QObject):
         else:
             self.cap.release()
 
-    def startTracking(self):
+    def recording(self):
+        print("녹화 시작")
         pass
 
-    def stopTracking(self):
+    def endRecording(self):
+        print("녹화 종료")
         pass
 
     def threadFunc(self):
@@ -62,10 +63,12 @@ class GPS(QObject):
             if ok:
                 # create image
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                rgb = cv2.flip(rgb, 1)
                 h, w, ch = rgb.shape
                 bytesPerLine = ch * w
                 img = QImage(rgb.data, w, h, bytesPerLine, QImage.Format_RGB888)
                 resizedImg = img.scaled(self.size.width(), self.size.height(), Qt.KeepAspectRatio)
+
                 self.sendImage.emit(resizedImg)
             else:
                 print('cam read errror')
